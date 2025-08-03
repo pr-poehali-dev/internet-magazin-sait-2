@@ -4,6 +4,10 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import Icon from '@/components/ui/icon'
 
 interface Product {
@@ -18,6 +22,24 @@ interface Product {
 
 interface CartItem extends Product {
   quantity: number
+}
+
+interface Order {
+  id: string
+  items: CartItem[]
+  total: number
+  status: 'pending' | 'confirmed' | 'shipped' | 'delivered'
+  date: string
+  address: string
+  paymentMethod: string
+}
+
+interface User {
+  name: string
+  email: string
+  phone: string
+  address: string
+  orders: Order[]
 }
 
 const mockProducts: Product[] = [
@@ -63,6 +85,64 @@ export default function Index() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [showCart, setShowCart] = useState(false)
   const [activeSection, setActiveSection] = useState('home')
+  const [showCheckout, setShowCheckout] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [showLogin, setShowLogin] = useState(false)
+  const [user, setUser] = useState<User>({
+    name: 'Иван Петров',
+    email: 'ivan@example.com',
+    phone: '+7 (999) 123-45-67',
+    address: 'Москва, ул. Пушкина, д. 10, кв. 5',
+    orders: [
+      {
+        id: 'ORD-2024-001',
+        items: [
+          {
+            id: 1,
+            name: 'Беспроводные наушники',
+            price: 4999,
+            image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&h=300&fit=crop',
+            category: 'Электроника',
+            rating: 4.5,
+            inStock: true,
+            quantity: 1
+          }
+        ],
+        total: 4999,
+        status: 'delivered',
+        date: '2024-07-15',
+        address: 'Москва, ул. Пушкина, д. 10, кв. 5',
+        paymentMethod: 'Банковская карта'
+      },
+      {
+        id: 'ORD-2024-002',
+        items: [
+          {
+            id: 2,
+            name: 'Умные часы',
+            price: 12999,
+            image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop',
+            category: 'Электроника',
+            rating: 4.8,
+            inStock: true,
+            quantity: 1
+          }
+        ],
+        total: 12999,
+        status: 'shipped',
+        date: '2024-07-28',
+        address: 'Москва, ул. Пушкина, д. 10, кв. 5',
+        paymentMethod: 'При получении'
+      }
+    ]
+  })
+  const [orderForm, setOrderForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    paymentMethod: 'card'
+  })
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -96,6 +176,62 @@ export default function Index() {
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
   const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+
+  const handleLogin = () => {
+    setIsLoggedIn(true)
+    setShowLogin(false)
+  }
+
+  const handleLogout = () => {
+    setIsLoggedIn(false)
+    setActiveSection('home')
+  }
+
+  const handleOrderSubmit = () => {
+    const newOrder: Order = {
+      id: `ORD-2024-${String(user.orders.length + 1).padStart(3, '0')}`,
+      items: [...cart],
+      total: totalPrice,
+      status: 'pending',
+      date: new Date().toISOString().split('T')[0],
+      address: orderForm.address,
+      paymentMethod: orderForm.paymentMethod === 'card' ? 'Банковская карта' : 'При получении'
+    }
+
+    setUser(prev => ({
+      ...prev,
+      orders: [newOrder, ...prev.orders]
+    }))
+
+    setCart([])
+    setShowCheckout(false)
+    setShowCart(false)
+    setActiveSection('account')
+  }
+
+  const clearCart = () => {
+    setCart([])
+  }
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'pending': return 'outline'
+      case 'confirmed': return 'secondary'
+      case 'shipped': return 'default'
+      case 'delivered': return 'default'
+      default: return 'outline'
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Обрабатывается'
+      case 'confirmed': return 'Подтверждён'
+      case 'shipped': return 'Отправлен'
+      case 'delivered': return 'Доставлен'
+      default: return status
+    }
+  }
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -141,6 +277,14 @@ export default function Index() {
                 >
                   Контакты
                 </button>
+                {isLoggedIn && (
+                  <button
+                    onClick={() => setActiveSection('account')}
+                    className={`text-sm font-medium transition-colors ${activeSection === 'account' ? 'text-primary border-b-2 border-primary pb-1' : 'text-gray-600 hover:text-primary'}`}
+                  >
+                    Личный кабинет
+                  </button>
+                )}
               </nav>
             </div>
             <div className="flex items-center space-x-4">
@@ -165,6 +309,40 @@ export default function Index() {
                   </Badge>
                 )}
               </Button>
+              {isLoggedIn ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                >
+                  <Icon name="LogOut" size={20} className="mr-2" />
+                  Выйти
+                </Button>
+              ) : (
+                <Dialog open={showLogin} onOpenChange={setShowLogin}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Icon name="User" size={20} className="mr-2" />
+                      Войти
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Вход в аккаунт</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Input placeholder="Email" type="email" />
+                      <Input placeholder="Пароль" type="password" />
+                      <Button className="w-full" onClick={handleLogin}>
+                        Войти
+                      </Button>
+                      <p className="text-sm text-gray-500 text-center">
+                        Нет аккаунта? <button className="text-primary hover:underline">Регистрация</button>
+                      </p>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
           </div>
         </div>
@@ -225,7 +403,21 @@ export default function Index() {
                       <span className="font-semibold">Итого:</span>
                       <span className="text-xl font-bold text-primary">{totalPrice.toLocaleString()} ₽</span>
                     </div>
-                    <Button className="w-full">Оформить заказ</Button>
+                    <div className="space-y-2">
+                      <Button 
+                        className="w-full" 
+                        onClick={() => isLoggedIn ? setShowCheckout(true) : setShowLogin(true)}
+                      >
+                        Оформить заказ
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="w-full" 
+                        onClick={clearCart}
+                      >
+                        Очистить корзину
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}
@@ -440,7 +632,242 @@ export default function Index() {
             </div>
           </section>
         )}
+
+        {activeSection === 'account' && isLoggedIn && (
+          <section>
+            <div className="max-w-6xl mx-auto">
+              <h2 className="text-3xl font-bold mb-8">Личный кабинет</h2>
+              <Tabs defaultValue="profile" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="profile">Профиль</TabsTrigger>
+                  <TabsTrigger value="orders">Заказы</TabsTrigger>
+                  <TabsTrigger value="settings">Настройки</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="profile">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Информация профиля</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="name">Имя</Label>
+                          <Input id="name" value={user.name} onChange={(e) => setUser(prev => ({ ...prev, name: e.target.value }))} />
+                        </div>
+                        <div>
+                          <Label htmlFor="email">Email</Label>
+                          <Input id="email" type="email" value={user.email} onChange={(e) => setUser(prev => ({ ...prev, email: e.target.value }))} />
+                        </div>
+                        <div>
+                          <Label htmlFor="phone">Телефон</Label>
+                          <Input id="phone" value={user.phone} onChange={(e) => setUser(prev => ({ ...prev, phone: e.target.value }))} />
+                        </div>
+                        <div>
+                          <Label htmlFor="address">Адрес</Label>
+                          <Input id="address" value={user.address} onChange={(e) => setUser(prev => ({ ...prev, address: e.target.value }))} />
+                        </div>
+                      </div>
+                      <Button>Сохранить изменения</Button>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="orders">
+                  <div className="space-y-4">
+                    {user.orders.map(order => (
+                      <Card key={order.id}>
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-lg">Заказ #{order.id}</CardTitle>
+                              <p className="text-sm text-gray-500">от {new Date(order.date).toLocaleDateString('ru-RU')}</p>
+                            </div>
+                            <Badge variant={getStatusBadgeVariant(order.status)}>
+                              {getStatusText(order.status)}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {order.items.map(item => (
+                              <div key={item.id} className="flex items-center space-x-3">
+                                <img src={item.image} alt={item.name} className="w-12 h-12 object-cover rounded" />
+                                <div className="flex-1">
+                                  <h4 className="font-medium">{item.name}</h4>
+                                  <p className="text-sm text-gray-500">
+                                    {item.quantity} шт. × {item.price.toLocaleString()} ₽
+                                  </p>
+                                </div>
+                                <span className="font-semibold">
+                                  {(item.price * item.quantity).toLocaleString()} ₽
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="border-t pt-3 mt-3">
+                            <div className="flex justify-between items-center mb-2">
+                              <span>Способ оплаты:</span>
+                              <span>{order.paymentMethod}</span>
+                            </div>
+                            <div className="flex justify-between items-center mb-2">
+                              <span>Адрес доставки:</span>
+                              <span className="text-sm">{order.address}</span>
+                            </div>
+                            <div className="flex justify-between items-center font-semibold text-lg">
+                              <span>Итого:</span>
+                              <span className="text-primary">{order.total.toLocaleString()} ₽</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="settings">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Настройки аккаунта</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label htmlFor="current-password">Текущий пароль</Label>
+                        <Input id="current-password" type="password" />
+                      </div>
+                      <div>
+                        <Label htmlFor="new-password">Новый пароль</Label>
+                        <Input id="new-password" type="password" />
+                      </div>
+                      <div>
+                        <Label htmlFor="confirm-password">Подтвердите пароль</Label>
+                        <Input id="confirm-password" type="password" />
+                      </div>
+                      <Button>Изменить пароль</Button>
+                      
+                      <div className="border-t pt-4 mt-6">
+                        <h3 className="font-semibold mb-3">Уведомления</h3>
+                        <div className="space-y-2">
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" defaultChecked />
+                            <span>Email уведомления о заказах</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" defaultChecked />
+                            <span>SMS уведомления</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" />
+                            <span>Промо-акции и скидки</span>
+                          </label>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </section>
+        )}
       </main>
+
+      {/* Checkout Modal */}
+      {showCheckout && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold">Оформление заказа</h2>
+                <Button variant="ghost" size="sm" onClick={() => setShowCheckout(false)}>
+                  <Icon name="X" size={20} />
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="order-name">Имя получателя</Label>
+                  <Input 
+                    id="order-name"
+                    value={orderForm.name} 
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Введите ваше имя"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="order-email">Email</Label>
+                  <Input 
+                    id="order-email"
+                    type="email"
+                    value={orderForm.email} 
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="example@mail.com"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="order-phone">Телефон</Label>
+                  <Input 
+                    id="order-phone"
+                    value={orderForm.phone} 
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="+7 (999) 123-45-67"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="order-address">Адрес доставки</Label>
+                  <Textarea 
+                    id="order-address"
+                    value={orderForm.address} 
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, address: e.target.value }))}
+                    placeholder="Укажите полный адрес доставки"
+                    rows={3}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="payment-method">Способ оплаты</Label>
+                  <Select 
+                    value={orderForm.paymentMethod} 
+                    onValueChange={(value) => setOrderForm(prev => ({ ...prev, paymentMethod: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="card">Банковская карта</SelectItem>
+                      <SelectItem value="cash">Наличные при получении</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold mb-3">Ваш заказ</h3>
+                  <div className="space-y-2">
+                    {cart.map(item => (
+                      <div key={item.id} className="flex justify-between text-sm">
+                        <span>{item.name} × {item.quantity}</span>
+                        <span>{(item.price * item.quantity).toLocaleString()} ₽</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t pt-2 mt-2">
+                    <div className="flex justify-between font-semibold">
+                      <span>Итого:</span>
+                      <span className="text-primary">{totalPrice.toLocaleString()} ₽</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <Button className="w-full" onClick={handleOrderSubmit}>
+                  Подтвердить заказ
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="bg-secondary text-white mt-16">
